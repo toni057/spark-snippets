@@ -76,3 +76,40 @@ Collect list will skip null values by default. A workaround is to wrap all value
     |    1|   b|  2|    [a, b]|
     +-----+----+---+----------+
 
+
+## 3. countDistinct over window
+
+    import org.apache.spark.sql.expressions.Window
+    import org.apache.spark.sql.functions._
+
+    val w = Window.orderBy($"timestamp".cast("long")).rangeBetween(Window.currentRow - 5L, Window.currentRow)
+    
+    sc.parallelize(
+      Seq(("id1", "2022-01-01T12:00:00+00:00"),
+          ("id2", "2022-01-01T12:00:02+00:00"),
+          ("id1", "2022-01-01T12:00:03+00:00"),
+          ("id3", "2022-01-01T12:00:08+00:00"),
+          ("id4", "2022-01-01T12:00:09+00:00"),
+          ("id2", "2022-01-01T12:00:10+00:00"),
+          ("id2", "2022-01-01T12:00:12+00:00"),
+          ("id3", "2022-01-01T12:00:14+00:00"),
+          ("id2", "2022-01-01T12:00:16+00:00"))
+      )
+      .toDF("id", "timestamp")
+      .withColumn("timestamp", $"timestamp".cast("timestamp"))
+      .withColumn("distinct_id_over_5_secs_window", size(collect_set("id").over(w)))
+      .show(false)
+      
+    +---+-------------------+------------------------------+
+    |id |timestamp          |distinct_id_over_5_secs_window|
+    +---+-------------------+------------------------------+
+    |id1|2022-01-01 12:00:00|1                             |
+    |id2|2022-01-01 12:00:02|2                             |
+    |id1|2022-01-01 12:00:03|2                             |
+    |id3|2022-01-01 12:00:08|2                             |
+    |id4|2022-01-01 12:00:09|2                             |
+    |id2|2022-01-01 12:00:10|3                             |
+    |id2|2022-01-01 12:00:12|3                             |
+    |id3|2022-01-01 12:00:14|3                             |
+    |id2|2022-01-01 12:00:16|2                             |
+    +---+-------------------+------------------------------+
